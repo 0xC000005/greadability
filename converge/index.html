@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+html, body {
+  width: 960px;
+  height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+svg {
+  overflow: visible;
+}
+
+.line-g path {
+  stroke: #d30000;
+}
+
+.links line {
+  stroke: #999;
+  stroke-opacity: 0.6;
+  stroke-width: 2px;
+}
+
+.nodes circle {
+  fill: #d30000;
+  stroke: #fff;
+  stroke-width: 1px;
+}
+
+</style>
+<svg class="graph"></svg>
+<svg class="convergence"></svg>
+<script src="greadability.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+var width = 600;
+var height = 600;
+
+var convWidth = 360;
+var convHeight = 300;
+var margin = {left: 40, right: 10, top: 30, bottom: 20};
+
+var metrics = [
+  {name: 'Edge crossings', varName: 'crossing', data: []},
+  {name: 'Crossing angle', varName: 'crossingAngle', data: []},
+  {name: 'Angular resolution (min)', varName: 'angularResolutionMin', data: []},
+  {name: 'Angular resolution (dev)', varName: 'angularResolutionDev', data: []}
+];
+
+var drag = d3.drag()
+  .on('start', dragStart)
+  .on('drag', dragging)
+  .on('end', dragEnd);
+
+var svg = d3.select('svg.graph')
+  .attr('width', width)
+  .attr('height', height);
+
+var convSvg = d3.select('svg.convergence')
+  .attr('width', convWidth)
+  .attr('height', convHeight)
+  .append('g')
+  .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+var x = d3.scaleLinear()
+  .domain([0, 300])
+  .range([0, (convWidth = convWidth - margin.left - margin.right)]);
+
+var y = d3.scaleLinear()
+  .domain([0, 1])
+  .range([(convHeight = convHeight - margin.top - margin.bottom), 0]);
+
+var line = d3.line()
+    .x(function (d) { return x(d[0]); })
+    .y(function (d) { return y(d[1]); });
+
+var forceSim = d3.forceSimulation()
+  .force('link', d3.forceLink())
+  .force('charge', d3.forceManyBody())
+  .force('center', d3.forceCenter(width/2, height/2));
+
+d3.json('miserables.json', function (error, graph) {
+  if (error) throw error;
+
+  var link = svg.append('g')
+    .attr('class', 'links')
+    .selectAll('line')
+    .data(graph.links)
+    .enter().append('line');
+
+  var node = svg.append('g')
+    .attr('class', 'nodes')
+    .selectAll('circle')
+    .data(graph.nodes)
+    .enter().append('circle')
+    .attr('r', 4)
+    .call(drag);
+
+  node.append('title').text(function (d) { return d.name; });
+
+  forceSim.nodes(graph.nodes)
+    .on('tick', tick)
+    .stop();
+
+  forceSim.force('link')
+    .links(graph.links);
+
+  var graphReadability = greadability.greadability(graph.nodes, graph.links);
+
+    metrics.forEach(function (m) {
+      var iterNum = 0;
+      m.data.push([iterNum, graphReadability[m.varName]]);
+    });
+
+  forceSim.restart();
+
+  function tick () {
+    link
+      .attr('x1', function (d) { return d.source.x; })
+      .attr('x2', function (d) { return d.target.x; })
+      .attr('y1', function (d) { return d.source.y; })
+      .attr('y2', function (d) { return d.target.y; });
+
+    node
+      .attr('cx', function (d) { return d.x; })
+      .attr('cy', function (d) { return d.y; });
+
+    var graphReadability = greadability.greadability(graph.nodes, graph.links);
+
+    metrics.forEach(function (m) {
+      var iterNum = m.data[m.data.length - 1][0] + 1;
+      m.data.push([iterNum, graphReadability[m.varName]]);
+
+      if (m.data.length > 301) {
+        m.data = m.data.slice(metrics.length - 301);
+      }
+    });
+
+    x.domain([metrics[0].data[0][0], metrics[0].data[0][0] + 300]);
+
+    convSvg.selectAll('*').remove();
+
+    convSvg.append('g')
+        .attr('transform', 'translate(0,' + convHeight + ')')
+        .call(d3.axisBottom(x).ticks(7))
+      .append("text")
+        .attr("fill", "#000")
+        .attr('transform', 'translate(' + convWidth + ',' + 0 + ')')
+        .attr("y", -10)
+        .attr("dy", "0.71em")
+        .attr("text-anchor", "end")
+        .text("Number of iterations");
+
+    convSvg.append('g')
+        .call(d3.axisLeft(y))
+      .append("text")
+        .attr("fill", "#000")
+        .attr("transform", "rotate(-90)")
+        .attr("y", -39)
+        .attr("dy", "0.71em")
+        .attr("text-anchor", "end")
+        .text("Readability score");
+
+    var lineG = convSvg.selectAll('g.line-g')
+        .data(metrics)
+      .enter().append('g')
+        .attr('class', function (d) { return 'line-g ' + d.varName; });
+
+    lineG.append('path')
+        .attr("fill", "none")
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
+        .attr("stroke-width", 1.5)
+        .attr("d", function (d) { return line(d.data); });
+
+    lineG.append("text")
+        .datum(function(d) { return {name: d.name, value: d.data[d.data.length - 1]}; })
+        .attr("transform", function(d) { return "translate(" + x(d.value[0]) + "," + y(d.value[1]) + ")"; })
+        .attr("x", 3)
+        .attr('y', -6)
+        .attr("dy", "0.35em")
+        .attr('text-anchor', 'end')
+        .style("font", "10px sans-serif")
+        .text(function(d) { return d.name; });
+  }
+});
+
+function dragStart (d) {
+  if (!d3.event.active) forceSim.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragging (d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragEnd (d) {
+  if (!d3.event.active) forceSim.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+</script>

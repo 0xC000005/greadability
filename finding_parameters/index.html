@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+html, body {
+  font: 12px sans-serif;
+}
+
+svg {
+  display: block;
+}
+
+.links line {
+  stroke: #999;
+  stroke-opacity: 0.6;
+  stroke-width: 2px;
+}
+
+.nodes circle {
+  fill: #d30000;
+  stroke: #fff;
+  stroke-width: 1px;
+}
+
+.chart circle {
+  fill: #aaa;
+  fill-opacity: 0.1;
+  stroke: #aaa;
+  stroke-opacity: 0.4;
+  cursor: pointer;
+}
+
+.chart circle.selected {
+  fill: #d30000;
+  fill-opacity: 0.6;
+  stroke: #d30000;
+  stroke-opacity: 0.8;
+}
+
+.column {
+  float: left;
+  margin: 0 10px;
+}
+
+</style>
+<div class="column">
+<svg class="chart"></svg>
+<svg class="graph"></svg>
+</div>
+<div class="column">
+<p class="progress">Testing</p>
+<p>Best parameters so far:</p>
+<ul class="best"></ul>
+</div>
+<script src="greadability.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+var width = 600;
+var height = 500;
+
+var chartWidth = 600;
+var chartHeight = 60;
+var margin = {left: 10, right: 10, top: 10, bottom: 40};
+
+var numTicks = 150;
+
+var selectedParams;
+var bestParams;
+
+var dispatch = d3.dispatch('layoutend');
+
+var svg = d3.select('svg.graph')
+  .attr('width', width)
+  .attr('height', height);
+
+var chartSvg = d3.select('svg.chart')
+  .attr('width', chartWidth)
+  .attr('height', chartHeight)
+  .append('g')
+  .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+chartWidth = chartWidth - margin.left - margin.right;
+chartHeight = chartHeight - margin.top - margin.bottom;
+
+var x = d3.scaleLinear()
+  .domain([0, 1])
+  .range([0, chartWidth]);
+
+chartSvg.append('g')
+    .attr('transform', 'translate(0,' + chartHeight + ')')
+    .call(d3.axisBottom(x).ticks(7))
+  .append("text")
+    .attr("fill", "#000")
+    .attr('transform', 'translate(' + chartWidth/2 + ',' + 0 + ')')
+    .attr("y", chartHeight + 10)
+    .attr("dy", "0.71em")
+    .attr("text-anchor", "middle")
+    .text("Average readability score");
+
+var readabilityCircles = chartSvg.append('g').selectAll('circle');
+
+d3.json('grid10x10.json', function (error, graph) {
+  if (error) throw error;
+
+  var link = svg.append('g')
+    .attr('class', 'links')
+    .selectAll('line')
+    .data(graph.links)
+    .enter().append('line');
+
+  var node = svg.append('g')
+    .attr('class', 'nodes')
+    .selectAll('circle')
+    .data(graph.nodes)
+    .enter().append('circle')
+    .attr('r', 4);
+
+  node.append('title').text(function (d) { return d.name; });
+
+  var paramGroups = [
+    {name: 'chargeStrength', values: [-30, -80]},
+    {name: 'linkDistance', values: [30, -80]},
+    {name: 'linkStrength', values: [null, 0.25]},
+    {name: 'gravity', values: [0, 0.5]},
+    {name: 'iterations', values: [1, 2]},
+    {name: 'alphaDecay', values: [0, 0.0228, 0.05]},
+    {name: 'velocityDecay', values: [0.4, 0.8]}
+  ];
+
+  var paramList = generateParams(paramGroups);
+
+  var bestSoFar = d3.select('.best').selectAll('li')
+    .data(paramGroups.map(function (d) { return d.name; }))
+    .enter().append('li')
+    .text(function (d) { return d; });
+
+  dispatch.on('layoutend', function (params, i) {
+    if (!bestParams || params.graphReadability > bestParams.graphReadability) {
+      bestParams = params;
+      selectedParams = bestParams;
+
+      bestSoFar
+        .data(d3.map(bestParams).keys().filter(function (d) { return d !== 'positions' && d !== 'graphReadability'; }))
+        .text(function (d) { return d + ' = ' + bestParams[d]; });
+    }
+
+    d3.select('.progress').text('Testing ' + (i + 1) + ' of ' + paramList.length + ' parameter settings');
+
+    // Plot the number line.
+    readabilityCircles = readabilityCircles
+      .data(readabilityCircles.data().concat(params))
+      .enter().append('circle')
+      .attr('cx', function (d) { return x(d.graphReadability); })
+      .attr('cy', 5)
+      .attr('r', 4)
+      .on('click', function (d) {
+        selectedParams = d;
+        readabilityCircles.classed('selected', false);
+        d3.select(this).classed('selected', true).raise();
+
+        bestSoFar
+          .data(d3.map(selectedParams).keys().filter(function (d) { return d !== 'positions' && d !== 'graphReadability'; }))
+          .text(function (d) { return d + ' = ' + selectedParams[d]; });
+
+        drawGraph();
+      })
+      .merge(readabilityCircles)
+      .classed('selected', function (d) { return d === selectedParams; });
+
+    readabilityCircles.filter(function (d) { return d === selectedParams; })
+      .raise();
+
+    drawGraph();
+  });
+
+  var i = 0;
+  var stepper = d3.timer(function () {
+    var p = paramList[i];
+    var forceSim = getForceSimFromParams(p);
+
+    // Reset node attributes.
+    graph.nodes.forEach(function (n) {
+      n.x = n.y = n.vx = n.vy = 0;
+    });
+
+    forceSim.nodes(graph.nodes)
+      .stop();
+
+    forceSim.force('link')
+      .links(graph.links);
+
+    for (var t = 0; t < numTicks; ++t) {
+      forceSim.tick();
+    }
+
+    p.graphReadability = greadability.greadability(graph.nodes, graph.links);
+    p.graphReadability = (p.graphReadability.crossing + p.graphReadability.crossingAngle +
+      p.graphReadability.angularResolutionMin + p.graphReadability.angularResolutionDev) / 4
+
+    p.positions = graph.nodes.map(function (n) { return {x: n.x, y: n.y}; });
+
+    dispatch.call('layoutend', forceSim, p, i);
+
+    ++i;
+    if (i >= paramList.length) {
+      stepper.stop();
+    }
+  });
+
+  function drawGraph () {
+    graph.nodes.forEach(function (n, i) {
+      n.x = selectedParams.positions[i].x;
+      n.y = selectedParams.positions[i].y;
+    });
+
+    var xDistance = d3.extent(graph.nodes, function (n) { return n.x; });
+    var xMin = xDistance[0];
+    xDistance = xDistance[1] - xDistance[0];
+
+    var yDistance = d3.extent(graph.nodes, function (n) { return n.y; });
+    var yMin = yDistance[0];
+    yDistance = yDistance[1] - yDistance[0];
+
+    graph.nodes.forEach(function (n, i) {
+      n.x = (height - 10) * (n.x - xMin) / Math.max(xDistance, yDistance);
+      n.y = (height - 10) * (n.y - yMin) / Math.max(xDistance, yDistance);
+    });
+
+    xDistance = d3.extent(graph.nodes, function (n) { return n.x; });
+    xMid = (xDistance[1] + xDistance[0]) / 2;
+    yDistance = d3.extent(graph.nodes, function (n) { return n.y; });
+    yMid = (yDistance[1] - yDistance[0]) / 2;
+
+    graph.nodes.forEach(function (n, i) {
+      n.x = n.x + width/2 - xMid;
+      n.y = n.y + height/2 - yMid;
+    });
+
+    link
+      .attr('x1', function (d) { return d.source.x; })
+      .attr('x2', function (d) { return d.target.x; })
+      .attr('y1', function (d) { return d.source.y; })
+      .attr('y2', function (d) { return d.target.y; });
+
+    node
+      .attr('cx', function (d) { return d.x; })
+      .attr('cy', function (d) { return d.y; });
+  }
+});
+
+function generateParams (paramGroups, paramList, currParam) {
+  var p = paramGroups[0];
+
+  if (!paramList) paramList = [];
+
+  if (!currParam) currParam = {};
+
+  p.values.forEach(function (v) {
+    var setting = {};
+    setting[p.name] = v;
+    if (paramGroups.length === 1) {
+      paramList.push(Object.assign(setting, currParam));
+    } else {
+      generateParams(paramGroups.slice(1), paramList, Object.assign(setting, currParam));
+    }
+  });
+
+  return paramList;
+}
+
+function getForceSimFromParams (params) {
+  var forceSim = d3.forceSimulation()
+    .force('link', d3.forceLink().iterations(params.iterations))
+    .force('charge', d3.forceManyBody().strength(params.chargeStrength))
+    .force('x', d3.forceX(0).strength(params.gravity))
+    .force('y', d3.forceY(0).strength(params.gravity))
+    .force('center', d3.forceCenter(0, 0))
+    .alphaDecay(params.alphaDecay)
+    .velocityDecay(params.velocityDecay);
+
+  if (params.linkStrength !== null) {
+    forceSim.force('link').strength(params.linkStrength);
+  }
+
+  return forceSim;
+}
+
+</script>
