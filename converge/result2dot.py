@@ -26,6 +26,8 @@ for node_data in data:
 # Write the graph to a .dot file
 nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 
+print(pos)
+
 # Draw the graph using the positions from layout.json
 nx.draw(G, pos, with_labels=True)
 
