@@ -4,7 +4,7 @@ import pandas as pd
 import json
 
 # Load the dolphin edges csv file
-df = pd.read_csv(r'C:\Users\0xc00\OneDrive\Documents\netviz\sample_graphs\dolphins-edges.csv')
+df = pd.read_csv(r'..\..\netviz\sample_graphs\dolphins-edges.csv')
 df['~from'] = df['~from'].str.replace('n', '')
 df['~from'] = df['~from'].astype(int)
 df['~to'] = df['~to'].str.replace('n', '')
