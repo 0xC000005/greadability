@@ -29,6 +29,7 @@ nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 print(pos)
 
 # Draw the graph using the positions from layout.json
+pos = {int(k): v for k, v in pos.items()}
 nx.draw(G, pos, with_labels=True)
 
 # Save the graph as a PNG image
