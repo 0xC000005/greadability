@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 # Create a path graph with 10 nodes
-df = pd.read_csv(r'C:\Users\0xc00\OneDrive\Documents\netviz\sample_graphs\price_10000nodes-edges.csv')
+df = pd.read_csv(r'C:\Users\0xc00\OneDrive\Documents\netviz\sample_graphs\dolphins-edges.csv')
 df['~from'] = df['~from'].str.replace('n', '')
 # convert every element to int
 df['~from'] = df['~from'].astype(int)
