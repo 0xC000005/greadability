@@ -21,6 +21,7 @@ with open("layout.json", "r") as f:
 # Add node positions to the graph
 pos = {}
 for node_data in data:
+    G.add_node(int(node_data["name"]), x=node_data["x"], y=node_data["y"])
     pos[int(node_data["name"])] = np.array([node_data["x"], node_data["y"]])
 
 print(pos)
