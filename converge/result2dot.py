@@ -27,8 +27,15 @@ for node_data in data:
 nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 
 print(pos)
+nodes = set(G.nodes())
+pos_keys = set(pos.keys())
+
+print("Nodes not in pos:", nodes - pos_keys)
+print("Pos keys not in nodes:", pos_keys - nodes)
+
 
 # Draw the graph using the positions from layout.json
+pos = {int(k): v for k, v in pos.items()}
 nx.draw(G, pos, with_labels=True)
 
 # Save the graph as a PNG image
