@@ -1,8 +1,15 @@
 import networkx as nx
 import json
+import pandas as pd
 
 # Create a path graph with 10 nodes
-G = nx.path_graph(10)
+df = pd.read_csv(r'C:\Users\0xc00\OneDrive\Documents\netviz\sample_graphs\price_10000nodes-edges.csv')
+df['~from'] = df['~from'].str.replace('n', '')
+# convert every element to int
+df['~from'] = df['~from'].astype(int)
+df['~to'] = df['~to'].str.replace('n', '')
+df['~to'] = df['~to'].astype(int)
+G = nx.from_pandas_edgelist(df, source='~from', target='~to', create_using=nx.Graph())
 
 # Convert graph to dictionary
 data = {
