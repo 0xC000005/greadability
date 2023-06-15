@@ -24,6 +24,8 @@ for node_data in data:
     G.add_node(node_data["name"], x=node_data["x"], y=node_data["y"])
     pos[node_data["name"]] = np.array([node_data["x"], node_data["y"]])
 
+print(pos)
+
 # Write the graph to a .dot file
 nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 
