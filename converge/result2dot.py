@@ -1,3 +1,4 @@
+import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,14 +22,10 @@ with open("layout.json", "r") as f:
 pos = {}
 for node_data in data:
     G.add_node(node_data["name"], x=node_data["x"], y=node_data["y"])
-    pos[node_data["name"]] = [node_data["x"], node_data["y"]]
+    pos[node_data["name"]] = np.array([node_data["x"], node_data["y"]])
 
 # Write the graph to a .dot file
 nx.drawing.nx_agraph.write_dot(G, "graph.dot")
-
-# calcuale a force directed layout
-pos = nx.spring_layout(G, pos=pos, iterations=10)
-print(pos)
 
 # Draw the graph
 nx.draw(G, pos=pos, with_labels=True)
