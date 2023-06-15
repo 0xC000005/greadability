@@ -25,7 +25,9 @@ for node_data in data:
     pos[node_data["name"]] = np.array([node_data["x"], node_data["y"]])
 
 print(pos)
-
+print(G.nodes())
+print(type(list(G.nodes())[0]))
+print(1111111111111111111111111111111111111111111111111111111111111111111)
 # Write the graph to a .dot file
 nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 
