@@ -1,15 +1,23 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import pandas as pd
 import json
+
+# Load the dolphin edges csv file
+df = pd.read_csv(r'C:\Users\0xc00\OneDrive\Documents\netviz\sample_graphs\dolphins-edges.csv')
+df['~from'] = df['~from'].str.replace('n', '')
+df['~from'] = df['~from'].astype(int)
+df['~to'] = df['~to'].str.replace('n', '')
+df['~to'] = df['~to'].astype(int)
+
+# Create a graph using edge data
+G = nx.from_pandas_edgelist(df, source='~from', target='~to', create_using=nx.Graph())
 
 # Load the layout.json under the current folder
 with open("layout.json", "r") as f:
     data = json.load(f)
 
-# Create a new graph
-G = nx.Graph()
-
-# Add nodes with their attributes to the graph
+# Add node positions to the graph
 pos = {}
 for node_data in data:
     G.add_node(node_data["name"], x=node_data["x"], y=node_data["y"])
@@ -20,7 +28,6 @@ nx.drawing.nx_agraph.write_dot(G, "graph.dot")
 
 # Draw the graph using the positions from layout.json
 nx.draw(G, pos, with_labels=True)
-plt.show()
 
-if __name__ == '__main__':
-    pass
+# Save the graph as a PNG image
+plt.savefig("graph.png")
